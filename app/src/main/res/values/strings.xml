@@ -1,0 +1,19 @@
+<resources>
+    <string name="app_name">6o6Test</string>
+
+    <string name="text_error">Something went wrong</string>
+    <string name="text_no_permission">App has no permission to use Camera</string>
+
+    <string name="text_set_upright">Please put phone on a firm surface in an upright position</string>
+    <string name="text_keep_upright">Make sure the phone stays steady</string>
+    <string name="text_is_upright">Excellent. Tap the button to proceed.</string>
+
+    <string name="text_stand_in_frame">Stand in front of the camera</string>
+    <string name="text_is_in_frame">Wonderful. We can start the test now.</string>
+
+    <string name="text_testing">Test is in progress…</string>
+
+    <string name="text_ready">Next</string>
+    <string name="text_start">Start Test</string>
+
+</resources>
