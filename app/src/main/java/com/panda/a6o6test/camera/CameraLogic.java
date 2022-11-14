@@ -6,6 +6,7 @@ import android.hardware.camera2.CameraCaptureSession;
 import android.hardware.camera2.CameraCharacteristics;
 import android.hardware.camera2.CameraDevice;
 import android.hardware.camera2.CameraManager;
+import android.hardware.camera2.CameraMetadata;
 import android.hardware.camera2.CaptureRequest;
 import android.hardware.camera2.CaptureResult;
 import android.hardware.camera2.TotalCaptureResult;
@@ -135,6 +136,8 @@ public class CameraLogic {
             public void onConfigured(@NonNull CameraCaptureSession cameraCaptureSession) {
                 try {
                     CaptureRequest.Builder builder = cameraDevice.createCaptureRequest(CameraDevice.TEMPLATE_PREVIEW);
+                    builder.set(CaptureRequest.STATISTICS_FACE_DETECT_MODE,
+                            CameraMetadata.STATISTICS_FACE_DETECT_MODE_FULL);
                     builder.addTarget(surfaceView.getHolder().getSurface());
                     cameraCaptureSession.setRepeatingRequest(builder.build(), getCaptureCallback(surfaceView), null);
                 } catch (CameraAccessException e) {

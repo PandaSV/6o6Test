@@ -52,7 +52,9 @@ public class PanelFragment extends Fragment implements MainStateListener {
 
     @Override
     public void onStateChanged(MainUiStateMachine.MainLogicState state) {
-        viewFlipper.setDisplayedChild(viewFlipper.indexOfChild(viewFlipper.findViewById(StateViewMap.getIdForState(state))));
+        if(getActivity() != null) {
+            getActivity().runOnUiThread(() -> viewFlipper.setDisplayedChild(viewFlipper.indexOfChild(viewFlipper.findViewById(StateViewMap.getIdForState(state)))));
+        }
     }
 
 }
