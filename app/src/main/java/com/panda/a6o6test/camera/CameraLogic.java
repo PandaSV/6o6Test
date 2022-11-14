@@ -11,11 +11,9 @@ import android.hardware.camera2.CaptureResult;
 import android.hardware.camera2.TotalCaptureResult;
 import android.hardware.camera2.params.Face;
 import android.os.Handler;
-import android.util.Log;
 import android.view.Surface;
 
 import androidx.annotation.NonNull;
-import androidx.fragment.app.Fragment;
 
 import com.panda.a6o6test.logic.MainUiStateMachine;
 import com.panda.a6o6test.permissions.PermissionUtility;
@@ -92,56 +90,64 @@ public class CameraLogic {
         CameraManager manager = (CameraManager) context.getSystemService(Context.CAMERA_SERVICE);
         try {
             String selfieCameraId = getSelfieCameraId(manager);
-            manager.openCamera(selfieCameraId, new CameraDevice.StateCallback() {
-                @Override
-                public void onOpened(@NonNull CameraDevice cameraDevice) {
-                    mCameraDevice = cameraDevice;
-                    final CameraCaptureSession.StateCallback stateCallback = new CameraCaptureSession.StateCallback() {
-                        @Override
-                        public void onConfigured(@NonNull CameraCaptureSession cameraCaptureSession) {
-                            try {
-                                CaptureRequest.Builder builder = cameraDevice.createCaptureRequest(CameraDevice.TEMPLATE_PREVIEW);
-                                builder.addTarget(surfaceView.getHolder().getSurface());
-                                cameraCaptureSession.setRepeatingRequest(builder.build(), getCaptureCallback(surfaceView), null);
-                            } catch (CameraAccessException e) {
-                                e.printStackTrace();
-                                MainUiStateMachine.getInstance().toError();
-                            }
-                        }
-
-                        @Override
-                        public void onConfigureFailed(@NonNull CameraCaptureSession cameraCaptureSession) {
-                            MainUiStateMachine.getInstance().toError();
-                        }
-                    };
-
-                    Vector<Surface> surfaces = new Vector<>();
-                    surfaces.add(surfaceView.getHolder().getSurface());
-                    try {
-                        cameraDevice.createCaptureSession(surfaces, stateCallback, handler);
-                        MainUiStateMachine.getInstance().toIdle();
-                    } catch (CameraAccessException e) {
-                        e.printStackTrace();
-                        MainUiStateMachine.getInstance().toNoPermission();
-                    } catch (Exception e){
-                        MainUiStateMachine.getInstance().toError();
-                    }
-                }
-
-                @Override
-                public void onDisconnected(@NonNull CameraDevice cameraDevice) {
-                    MainUiStateMachine.getInstance().toError();
-                }
-
-                @Override
-                public void onError(@NonNull CameraDevice cameraDevice, int i) {
-                    MainUiStateMachine.getInstance().toError();
-                }
-            }, null);
+            manager.openCamera(selfieCameraId, getCameraDeviceStateCallback(surfaceView, handler), null);
         } catch (CameraAccessException | SecurityException e) {
             MainUiStateMachine.getInstance().toNoPermission();
             e.printStackTrace();
         }
+    }
+
+    private CameraDevice.StateCallback getCameraDeviceStateCallback(CameraSurfaceView surfaceView, Handler handler){
+        return new CameraDevice.StateCallback() {
+            @Override
+            public void onOpened(@NonNull CameraDevice cameraDevice) {
+                mCameraDevice = cameraDevice;
+                final CameraCaptureSession.StateCallback stateCallback = getCaptureSessionCallback(cameraDevice, surfaceView);
+
+                Vector<Surface> surfaces = new Vector<>();
+                surfaces.add(surfaceView.getHolder().getSurface());
+                try {
+                    cameraDevice.createCaptureSession(surfaces, stateCallback, handler);
+                    MainUiStateMachine.getInstance().toIdle();
+                } catch (CameraAccessException e) {
+                    e.printStackTrace();
+                    MainUiStateMachine.getInstance().toNoPermission();
+                } catch (Exception e){
+                    MainUiStateMachine.getInstance().toError();
+                }
+            }
+
+            @Override
+            public void onDisconnected(@NonNull CameraDevice cameraDevice) {
+                MainUiStateMachine.getInstance().toError();
+            }
+
+            @Override
+            public void onError(@NonNull CameraDevice cameraDevice, int i) {
+                MainUiStateMachine.getInstance().toError();
+            }
+        };
+    }
+
+    private CameraCaptureSession.StateCallback getCaptureSessionCallback(CameraDevice cameraDevice, CameraSurfaceView surfaceView){
+        return new CameraCaptureSession.StateCallback() {
+            @Override
+            public void onConfigured(@NonNull CameraCaptureSession cameraCaptureSession) {
+                try {
+                    CaptureRequest.Builder builder = cameraDevice.createCaptureRequest(CameraDevice.TEMPLATE_PREVIEW);
+                    builder.addTarget(surfaceView.getHolder().getSurface());
+                    cameraCaptureSession.setRepeatingRequest(builder.build(), getCaptureCallback(surfaceView), null);
+                } catch (CameraAccessException e) {
+                    e.printStackTrace();
+                    MainUiStateMachine.getInstance().toError();
+                }
+            }
+
+            @Override
+            public void onConfigureFailed(@NonNull CameraCaptureSession cameraCaptureSession) {
+                MainUiStateMachine.getInstance().toError();
+            }
+        };
     }
 
     private CameraCaptureSession.CaptureCallback getCaptureCallback(FaceRectReceiver faceRectReceiver){
