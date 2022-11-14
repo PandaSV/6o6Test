@@ -22,14 +22,25 @@ public class OrientationManager implements SensorEventListener {
     private final SensorManager mSensorManager;
 
     @Nullable
-    private final Sensor rotationVectorSensor;
+    private Sensor rotationVectorSensor;
 
     private int mLastAccuracy;
     private RotationOrientationListener orientationListener;
 
     public OrientationManager(Context context) {
         mSensorManager = (SensorManager) context.getSystemService(Activity.SENSOR_SERVICE);
+
+//        // uncomment to log all sensors available on device
+//        List<Sensor> msensorList = mSensorManager.getSensorList(Sensor.TYPE_ALL);
+//        for (Sensor sensor: msensorList) {
+//            Log.d("SENSORICS", sensor.getName() + " " + sensor.getStringType());
+//        }
+
+        //seems like on some devices only the TYPE_GAME_ROTATION_VECTOR is present
         rotationVectorSensor = mSensorManager.getDefaultSensor(Sensor.TYPE_ROTATION_VECTOR);
+        if(rotationVectorSensor == null){
+            rotationVectorSensor = mSensorManager.getDefaultSensor(Sensor.TYPE_GAME_ROTATION_VECTOR);
+        }
     }
 
     /**
