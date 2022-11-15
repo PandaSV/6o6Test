@@ -17,7 +17,6 @@ import com.panda.a6o6test.logic.MainUiStateMachine;
 /**
  * UI part showing "instructions" and buttons.
  * Should have been a transparent overlay, but it would take extra time.
- * TODO Implement this as a transparent overlay on top of camera preview
  */
 public class PanelFragment extends Fragment implements MainStateListener {
 
