@@ -1,6 +1,7 @@
 package com.panda.a6o6test.camera;
 
 import android.content.Context;
+import android.graphics.ImageFormat;
 import android.hardware.camera2.CameraAccessException;
 import android.hardware.camera2.CameraCaptureSession;
 import android.hardware.camera2.CameraCharacteristics;
@@ -11,14 +12,23 @@ import android.hardware.camera2.CaptureRequest;
 import android.hardware.camera2.CaptureResult;
 import android.hardware.camera2.TotalCaptureResult;
 import android.hardware.camera2.params.Face;
+import android.media.Image;
+import android.media.ImageReader;
 import android.os.Handler;
+import android.util.Log;
 import android.view.Surface;
 
 import androidx.annotation.NonNull;
 
+import com.google.android.gms.tasks.OnCanceledListener;
+import com.google.android.gms.tasks.OnSuccessListener;
+import com.google.mlkit.vision.face.FaceDetection;
+import com.google.mlkit.vision.face.FaceDetector;
+import com.google.mlkit.vision.face.FaceDetectorOptions;
 import com.panda.a6o6test.logic.MainUiStateMachine;
 import com.panda.a6o6test.permissions.PermissionUtility;
 
+import java.util.List;
 import java.util.Vector;
 
 /**
@@ -30,8 +40,12 @@ import java.util.Vector;
  */
 public class CameraLogic {
 
+    private static final int IMG_BUFFER_SIZE = 4;
+
     private static CameraLogic instance;
     private CameraDevice mCameraDevice;
+    private FaceDetector faceDetector;
+    private ImageReader imageReader;
 
     private CameraLogic(){}
 
@@ -68,6 +82,14 @@ public class CameraLogic {
      * Stops camera. To be called from onPause.
      */
     public void stopCamera() {
+        if(imageReader != null){
+            imageReader.close();
+            imageReader = null;
+        }
+        if(faceDetector != null){
+            faceDetector.close();
+            faceDetector = null;
+        }
         if(mCameraDevice != null){
             mCameraDevice.close();
             mCameraDevice = null;
@@ -92,10 +114,50 @@ public class CameraLogic {
         try {
             String selfieCameraId = getSelfieCameraId(manager);
             manager.openCamera(selfieCameraId, getCameraDeviceStateCallback(surfaceView, handler), null);
+            FaceDetectorOptions options =
+                    new FaceDetectorOptions.Builder()
+                            .setPerformanceMode(FaceDetectorOptions.PERFORMANCE_MODE_ACCURATE)
+                            .setLandmarkMode(FaceDetectorOptions.LANDMARK_MODE_ALL)
+                            .setClassificationMode(FaceDetectorOptions.CLASSIFICATION_MODE_ALL)
+                            .setMinFaceSize(0.15f)
+                            .enableTracking()
+                            .build();
+            faceDetector = FaceDetection.getClient(options);
+            imageReader = ImageReader.newInstance(1080, 1920, ImageFormat.YUV_420_888, IMG_BUFFER_SIZE);
+            imageReader.setOnImageAvailableListener(getOnImageAvailableListener(surfaceView), handler);
         } catch (CameraAccessException | SecurityException e) {
             MainUiStateMachine.getInstance().toNoPermission();
             e.printStackTrace();
         }
+    }
+
+    private ImageReader.OnImageAvailableListener getOnImageAvailableListener(FaceRectReceiver faceRectReceiver){
+        return new ImageReader.OnImageAvailableListener() {
+            @Override
+            public void onImageAvailable(ImageReader reader) {
+                //Log.d("MLLIB", "onImageAvailable");
+                Image image = reader.acquireLatestImage();
+                faceDetector.process(image, 0).addOnCanceledListener(new OnCanceledListener() {
+                    @Override
+                    public void onCanceled() {
+                        Log.d("MLLIB", "onCanceled");
+                    }
+                }).addOnSuccessListener(new OnSuccessListener<List<com.google.mlkit.vision.face.Face>>() {
+                    @Override
+                    public void onSuccess(List<com.google.mlkit.vision.face.Face> faces) {
+                        if(faces != null && faces.size()>0){
+                            Log.d("MLLIB", "onSuccess "+faces.size());
+                            faceRectReceiver.setFaceRect(faces.get(0).getBoundingBox());
+                            MainUiStateMachine.getInstance().toAllGo();
+                        }else{
+                            faceRectReceiver.setFaceRect(null);
+                            MainUiStateMachine.getInstance().toNoFaceFromDetection();
+                        }
+                    }
+                });
+                image.close();
+            }
+        };
     }
 
     private CameraDevice.StateCallback getCameraDeviceStateCallback(CameraSurfaceView surfaceView, Handler handler){
@@ -107,6 +169,7 @@ public class CameraLogic {
 
                 Vector<Surface> surfaces = new Vector<>();
                 surfaces.add(surfaceView.getHolder().getSurface());
+                surfaces.add(imageReader.getSurface());
                 try {
                     cameraDevice.createCaptureSession(surfaces, stateCallback, handler);
                     MainUiStateMachine.getInstance().toIdle();
@@ -139,6 +202,7 @@ public class CameraLogic {
                     builder.set(CaptureRequest.STATISTICS_FACE_DETECT_MODE,
                             CameraMetadata.STATISTICS_FACE_DETECT_MODE_FULL);
                     builder.addTarget(surfaceView.getHolder().getSurface());
+                    builder.addTarget(imageReader.getSurface());
                     cameraCaptureSession.setRepeatingRequest(builder.build(), getCaptureCallback(surfaceView), null);
                 } catch (CameraAccessException e) {
                     e.printStackTrace();
@@ -159,7 +223,7 @@ public class CameraLogic {
             @Override
             public void onCaptureCompleted(@NonNull CameraCaptureSession session, @NonNull CaptureRequest request, @NonNull TotalCaptureResult result) {
                 super.onCaptureCompleted(session, request, result);
-                lookForFaces(result);
+//                lookForFaces(result);
             }
 
             void lookForFaces(CaptureResult result){
