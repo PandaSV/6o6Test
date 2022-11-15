@@ -1,4 +1,4 @@
-package com.panda.a6o6test.camera;
+package com.panda.a6o6test.ui;
 
 import android.content.Context;
 import android.graphics.Canvas;
@@ -8,32 +8,33 @@ import android.graphics.Path;
 import android.graphics.Rect;
 import android.graphics.RectF;
 import android.util.AttributeSet;
-import android.view.SurfaceView;
+import android.view.View;
 
 import com.panda.a6o6test.R;
+import com.panda.a6o6test.camera.FaceRectReceiver;
 import com.panda.a6o6test.sensors.RotationOrientationListener;
 import com.panda.a6o6test.sensors.SensorConstants;
 
 /**
- * A subclass of SurfaceView with "HUD" drawn over, reacting to orientation and face detection
+ * A custom View for showing "HUD", reacting to orientation and face detection
  */
-public class CameraSurfaceView extends SurfaceView implements RotationOrientationListener, FaceRectReceiver {
+public class HudView extends View implements RotationOrientationListener, FaceRectReceiver {
 
     private Paint paintFace, paintHud, paintBounds;
     private RectF rectFace;
     private Path rotatedPlane, plane, horizon, shiftedHorizon, horizonBounds, rollBounds, shiftedRollBounds;
 
-    public CameraSurfaceView(Context context) {
+    public HudView(Context context) {
         super(context);
         init(context);
     }
 
-    public CameraSurfaceView(Context context, AttributeSet attrs) {
+    public HudView(Context context, AttributeSet attrs) {
         super(context, attrs);
         init(context);
     }
 
-    public CameraSurfaceView(Context context, AttributeSet attrs, int defStyleAttr) {
+    public HudView(Context context, AttributeSet attrs, int defStyleAttr) {
         super(context, attrs, defStyleAttr);
         init(context);
     }
@@ -55,30 +56,45 @@ public class CameraSurfaceView extends SurfaceView implements RotationOrientatio
         paintBounds.setStyle(Paint.Style.STROKE);
         paintBounds.setColor(context.getColor(R.color.hud_static));
 
-        //a way of ensuring view exists and has dimensions
-        this.post(() -> {
-            setWillNotDraw(false);
-            initPaths(getWidth(), getHeight());
-        });
+        initPaths(getWidth(), getHeight());
+
     }
 
     @Override
-    public void setFaceRect(Rect rect){
+    protected void onMeasure(int widthMeasureSpec, int heightMeasureSpec) {
+        super.onMeasure(widthMeasureSpec, heightMeasureSpec);
+        initPaths(widthMeasureSpec, heightMeasureSpec);
+    }
+
+    @Override
+    protected void onSizeChanged(int w, int h, int oldw, int oldh) {
+        super.onSizeChanged(w, h, oldw, oldh);
+        initPaths(w, h);
+    }
+
+    @Override
+    public void setFaceRect(Rect rect, int degrees, int width, int height){
+        //TODO this now has to receive the same transformation matrix used in making the preview. Would take additional time.
         if(rect != null){
             this.rectFace = new RectF(rect);
             Matrix matrix = new Matrix();
             matrix.setScale(-1, 1);
-            matrix.postRotate(90);
+            matrix.postRotate(degrees);
 
             //just guessing the scale - no time for playing with adapting the image sizes
             matrix.postScale(0.6f, 0.6f);
 
-            matrix.postTranslate(getMeasuredWidth(), getMeasuredHeight());
+            matrix.postTranslate(width, height);
             matrix.mapRect(this.rectFace);
             matrix.reset();
         }else{
             this.rectFace = null;
         }
+    }
+
+    @Override
+    public void resetFaceRect() {
+        this.rectFace = null;
     }
 
     // init HUD shapes

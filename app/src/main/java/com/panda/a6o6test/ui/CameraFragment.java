@@ -1,9 +1,11 @@
 package com.panda.a6o6test.ui;
 
+import android.graphics.SurfaceTexture;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.HandlerThread;
 import android.view.LayoutInflater;
+import android.view.TextureView;
 import android.view.View;
 import android.view.ViewGroup;
 
@@ -13,8 +15,8 @@ import androidx.annotation.Nullable;
 import androidx.fragment.app.Fragment;
 
 import com.panda.a6o6test.R;
+import com.panda.a6o6test.camera.AutoFitTextureView;
 import com.panda.a6o6test.camera.CameraLogic;
-import com.panda.a6o6test.camera.CameraSurfaceView;
 import com.panda.a6o6test.logic.MainUiStateMachine;
 import com.panda.a6o6test.permissions.CameraPermissionCallback;
 import com.panda.a6o6test.permissions.PermissionUtility;
@@ -22,9 +24,37 @@ import com.panda.a6o6test.sensors.OrientationManager;
 
 public class CameraFragment extends Fragment implements CameraPermissionCallback{
 
-    private CameraSurfaceView surfaceView;
+    private AutoFitTextureView textureView;
+    private HudView hudView;
     private ActivityResultLauncher<String> activityResultLauncher;
     private Handler cameraHandler;
+    /**
+     * {@link TextureView.SurfaceTextureListener} handles several lifecycle events on a
+     * {@link TextureView}.
+     */
+    private final TextureView.SurfaceTextureListener mSurfaceTextureListener
+            = new TextureView.SurfaceTextureListener() {
+
+        @Override
+        public void onSurfaceTextureAvailable(SurfaceTexture texture, int width, int height) {
+            startCamera(cameraHandler, width, height);
+        }
+
+        @Override
+        public void onSurfaceTextureSizeChanged(SurfaceTexture texture, int width, int height) {
+            CameraLogic.getInstance().configureTransform(getActivity(), textureView,width, height);
+        }
+
+        @Override
+        public boolean onSurfaceTextureDestroyed(SurfaceTexture texture) {
+            return true;
+        }
+
+        @Override
+        public void onSurfaceTextureUpdated(SurfaceTexture texture) {
+        }
+
+    };
     private HandlerThread handlerThread;
     private OrientationManager orientationManager;
     private boolean triedGettingPermission;
@@ -43,7 +73,8 @@ public class CameraFragment extends Fragment implements CameraPermissionCallback
 
     @Override
     public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
-        surfaceView = view.findViewById(R.id.video_surface);
+        textureView = view.findViewById(R.id.video_surface);
+        hudView = view.findViewById(R.id.hud_view);
         if(getContext()!=null) {
             orientationManager = new OrientationManager(getContext());
         }
@@ -55,12 +86,16 @@ public class CameraFragment extends Fragment implements CameraPermissionCallback
         MainUiStateMachine.getInstance().onResume();
         startBgThread();
         if(PermissionUtility.checkCameraPermission(getContext())) {
-            surfaceView.post(() -> startCamera(cameraHandler));
+            if (textureView.isAvailable()) {
+                startCamera(cameraHandler, textureView.getWidth(), textureView.getHeight());
+            } else {
+                textureView.setSurfaceTextureListener(mSurfaceTextureListener);
+            }
         }else if(!triedGettingPermission){
             PermissionUtility.requestCameraPermission(activityResultLauncher);
             triedGettingPermission = true;
         }
-        orientationManager.startListening(surfaceView);
+        orientationManager.startListening(hudView);
     }
 
     @Override
@@ -72,8 +107,8 @@ public class CameraFragment extends Fragment implements CameraPermissionCallback
         super.onPause();
     }
 
-    private void startCamera(Handler handler){
-        CameraLogic.getInstance().startCamera(this.getContext(), surfaceView, handler);
+    private void startCamera(Handler handler, int width, int height){
+        CameraLogic.getInstance().startCamera(getActivity(), textureView, hudView, handler, width, height);
     }
 
     private void stopCamera(){
@@ -102,7 +137,6 @@ public class CameraFragment extends Fragment implements CameraPermissionCallback
     public void onPermission(boolean hasPermission) {
         if(hasPermission){
             MainUiStateMachine.getInstance().toIdle();
-            startCamera(cameraHandler);
         }else{
             stopCamera();
             MainUiStateMachine.getInstance().toNoPermission();

@@ -7,5 +7,10 @@ public interface FaceRectReceiver {
     /**
      * @param rect Bounds of the detected face
      */
-    void setFaceRect(Rect rect);
+    void setFaceRect(Rect rect, int degrees, int width, int height);
+
+    /**
+     * Resets the face rectangle to null
+     */
+    void resetFaceRect();
 }
